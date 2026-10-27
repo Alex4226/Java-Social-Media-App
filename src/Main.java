@@ -3,8 +3,9 @@ import domain.Tuple;
 import domain.User;
 import domain.validators.FriendshipValidator;
 import domain.validators.UserValidator;
-import repository.InMemoryRepository;
+import domain.validators.Validator;
 import repository.Repository;
+import repository.RepositoryFactory;
 import service.SocialNetworkService;
 import ui.ConsoleUI;
 
@@ -20,22 +21,17 @@ public class Main {
      * @param args argumentele primite din linia de comanda
      */
     public static void main(String[] args) {
-        UserValidator userValidator = new UserValidator();
-        FriendshipValidator friendshipValidator = new FriendshipValidator();
+        Validator<User> userValidator = new UserValidator();
+        Validator<Friendship> friendshipValidator = new FriendshipValidator();
 
-        Repository<Long, User> userRepo = new InMemoryRepository<>(userValidator);
-        Repository<Tuple<Long, Long>, Friendship> friendshipRepo = new InMemoryRepository<>(friendshipValidator);
+        RepositoryFactory factory = new RepositoryFactory("application.properties");
 
-        SocialNetworkService service = new SocialNetworkService(userRepo, friendshipRepo);
+        Repository<Long, User> userRepository = factory.createUserRepository(userValidator);
+        Repository<Tuple<Long, Long>, Friendship> friendshipRepository = factory.createFriendshipRepository(friendshipValidator);
 
-        service.addUser("Ion", "Popescu", "ion@test.com");
-        service.addUser("Maria", "Ionescu", "maria@test.com");
-        service.addUser("Andrei", "Radu", "andrei@test.com");
-        service.addUser("Elena", "Stan", "elena@test.com");
-        service.addFriendship(1L, 2L);
-        service.addFriendship(2L, 3L);
+        SocialNetworkService service = new SocialNetworkService(userRepository, friendshipRepository);
+        ConsoleUI console = new ConsoleUI(service);
 
-        ConsoleUI ui = new ConsoleUI(service);
-        ui.run();
+        console.run();
     }
 }

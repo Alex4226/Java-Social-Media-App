@@ -25,7 +25,17 @@ public class SocialNetworkService {
     public SocialNetworkService(Repository<Long, User> userRepo, Repository<Tuple<Long, Long>, Friendship> friendshipRepo) {
         this.userRepo = userRepo;
         this.friendshipRepo = friendshipRepo;
-        this.currentUserId = 1L;
+        this.currentUserId = computeNextUserId();
+    }
+
+    private Long computeNextUserId() {
+        Long maxId = 0L;
+        for (User user : userRepo.getAll()) {
+            if (user.getId() != null & user.getId() > maxId) {
+                maxId = user.getId();
+            }
+        }
+        return maxId + 1;
     }
 
     /**
