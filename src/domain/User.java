@@ -1,21 +1,25 @@
 package domain;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 /**
- * Reprezinta un utilizator din cadrul retelei sociale[cite: 1, 2].
- * Extinde clasa generica Entity, avand identificatorul de tip Long[cite: 1].
+ * Entity representing a user in the social network application.
  */
 public class User extends Entity<Long> {
     private String firstName;
     private String lastName;
     private String email;
+    private final List<User> friends = new ArrayList<>();
 
     /**
-     * Constructor care initializeaza un utilizator cu ID, prenume, nume si adresa de email[cite: 1].
+     * Constructs a new User instance.
      *
-     * @param id        identificatorul unic al utilizatorului[cite: 1]
-     * @param firstName prenumele utilizatorului
-     * @param lastName  numele de familie al utilizatorului
-     * @param email     adresa de email a utilizatorului
+     * @param id        the unique identifier of the user
+     * @param firstName the user's first name
+     * @param lastName  the user's last name
+     * @param email     the user's email address
      */
     public User(Long id, String firstName, String lastName, String email) {
         super(id);
@@ -25,66 +29,110 @@ public class User extends Entity<Long> {
     }
 
     /**
-     * Returneaza prenumele utilizatorului.
+     * Retrieves the first name of the user.
      *
-     * @return prenumele utilizatorului
+     * @return the first name
      */
     public String getFirstName() {
-        return this.firstName;
+        return firstName;
     }
 
     /**
-     * Returneaza numele de familie al utilizatorului.
+     * Updates the first name of the user.
      *
-     * @return numele de familie
-     */
-    public String getLastName() {
-        return this.lastName;
-    }
-
-    /**
-     * Returneaza adresa de email a utilizatorului.
-     *
-     * @return adresa de email
-     */
-    public String getEmail() {
-        return this.email;
-    }
-
-    /**
-     * Actualizeaza prenumele utilizatorului.
-     *
-     * @param firstName noul prenume ce va fi setat
+     * @param firstName the new first name
      */
     public void setFirstName(String firstName) {
         this.firstName = firstName;
     }
 
     /**
-     * Actualizeaza numele de familie al utilizatorului.
+     * Retrieves the last name of the user.
      *
-     * @param lastName noul nume de familie ce va fi setat
+     * @return the last name
+     */
+    public String getLastName() {
+        return lastName;
+    }
+
+    /**
+     * Updates the last name of the user.
+     *
+     * @param lastName the new last name
      */
     public void setLastName(String lastName) {
         this.lastName = lastName;
     }
 
     /**
-     * Actualizeaza adresa de email a utilizatorului.
+     * Retrieves the email address of the user.
      *
-     * @param email noua adresa de email
+     * @return the email address
+     */
+    public String getEmail() {
+        return email;
+    }
+
+    /**
+     * Updates the email address of the user.
+     *
+     * @param email the new email address
      */
     public void setEmail(String email) {
         this.email = email;
     }
 
     /**
-     * Returneaza o reprezentare textuala a atributelor utilizatorului.
+     * Retrieves the list of friends connected to this user.
      *
-     * @return sirul de caractere continand ID-ul, numele, prenumele si email-ul
+     * @return the list of friend entities
      */
+    public List<User> getFriends() {
+        return friends;
+    }
+
+    /**
+     * Adds an existing user as a friend if not already present.
+     *
+     * @param friend the user to add as friend
+     */
+    public void addFriend(User friend) {
+        if (friend != null && !this.friends.contains(friend)) {
+            this.friends.add(friend);
+        }
+    }
+
+    /**
+     * Removes a user from the list of friends.
+     *
+     * @param friend the user to remove from friends
+     */
+    public void removeFriend(User friend) {
+        if (friend != null) {
+            this.friends.remove(friend);
+        }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof User user)) return false;
+        return Objects.equals(getId(), user.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getId());
+    }
+
     @Override
     public String toString() {
-        return "ID: " + this.getId() + " , Nume: " + this.getLastName() + " , Prenume: " + this.getFirstName() + " , Email: " + this.getEmail();
+        return "User{" +
+                "id=" + getId() +
+                ", firstName='" + firstName + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", email='" + email + '\'' +
+                ", friendsCount=" + friends.size() +
+                '}';
     }
 }

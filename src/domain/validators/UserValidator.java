@@ -3,17 +3,15 @@ package domain.validators;
 import domain.User;
 
 /**
- * Validator concret pentru entitatea User[cite: 1, 3].
- * Implementeaza interfata Validator conform sablonului de proiectare Strategy[cite: 3].
+ * Concrete validator for User entities, implementing the Strategy pattern[cite: 1, 3].
  */
 public class UserValidator implements Validator<User> {
 
     /**
-     * Valideaza datele unui utilizator[cite: 1, 3].
+     * Validates a given User entity against core domain rules[cite: 1, 3].
      *
-     * @param entity utilizatorul care se valideaza[cite: 1, 3]
-     * @throws ValidationException daca utilizatorul este null, daca numele sau prenumele sunt goale,
-     *                             sau daca adresa de email nu contine caracterul '@'[cite: 3]
+     * @param entity the user entity to validate[cite: 1, 3]
+     * @throws ValidationException if the entity is null, has blank names, or an invalid email format[cite: 3]
      */
     @Override
     public void validate(User entity) {

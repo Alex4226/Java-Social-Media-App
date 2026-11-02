@@ -1,16 +1,36 @@
 package domain.validators;
 
+import java.util.Objects;
+
 /**
- * Interfata generica pentru validarea entitatilor din aplicatie (Strategy Pattern)[cite: 3].
+ * Functional interface used to validate entities within the domain model.
  *
- * @param <T> tipul entitatii ce urmeaza sa fie validata
+ * @param <T> the type of entity to be validated
  */
+@FunctionalInterface
 public interface Validator<T> {
+
     /**
-     * Valideaza o entitate conform regulilor de consistenta a datelor[cite: 3].
+     * Validates the specified entity against defined business and consistency rules.
      *
-     * @param entity entitatea care se valideaza
-     * @throws ValidationException daca datele entitatii nu sunt valide[cite: 3]
+     * @param entity the entity to validate
+     * @throws ValidationException if the entity violates any validation rule
      */
     void validate(T entity) throws ValidationException;
+
+    /**
+     * Returns a composed {@code Validator} that performs, in sequence, this operation
+     * followed by the {@code other} operation.
+     *
+     * @param other the other validator to be executed after this one
+     * @return a composed {@code Validator} executing both validations sequentially
+     * @throws NullPointerException if {@code other} is null
+     */
+    default Validator<T> andThen(Validator<T> other) {
+        Objects.requireNonNull(other, "The following validator must not be null");
+        return entity -> {
+            this.validate(entity);
+            other.validate(entity);
+        };
+    }
 }

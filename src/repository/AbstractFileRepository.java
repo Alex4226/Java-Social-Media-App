@@ -5,10 +5,17 @@ import domain.validators.ValidationException;
 import domain.validators.Validator;
 import repository.exceptions.RepositoryException;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * Abstract class that manages file loading and saving for every entity type. Inherites InMemoryRepository
@@ -47,28 +54,30 @@ public abstract class AbstractFileRepository<ID,E extends Entity<ID>> extends In
      * Loads data into repository from file
      */
     protected void loadData() {
-        File file = new File(filename);
-        if (!file.exists()) return;
+        Path path = Paths.get(filename);
+        if (!Files.exists(path)) {
+            return;
+        }
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(file, StandardCharsets.UTF_8))) {
-            String line;
-            int lineNumber = 0;
+        try (Stream<String> linesStream = Files.lines(path, StandardCharsets.UTF_8)) {
+            List<String> allLines = linesStream.collect(Collectors.toList());
 
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
-                if (line.trim().isEmpty()) {
-                    continue;
-                }
+            IntStream.range(0, allLines.size())
+                    .forEach(index -> {
+                        int lineNumber = index + 1;
+                        String line = allLines.get(index);
 
-                try {
-                    String[] parts = line.split(";", -1);
-                    List<String> attributes = Arrays.asList(parts);
-                    E entity = extractEntity(attributes);
-                    super.add(entity);
-                } catch (ValidationException | IllegalArgumentException e) {
-                    System.err.println("Line " + lineNumber + " is corrupt or invalid: " + e.getMessage());
-                }
-            }
+                        if (line != null && !line.trim().isEmpty()) {
+                            try {
+                                String[] parts = line.split(";", -1);
+                                List<String> attributes = Arrays.asList(parts);
+                                E entity = extractEntity(attributes);
+                                super.add(entity);
+                            } catch (ValidationException | IllegalArgumentException e) {
+                                System.err.println("Line" + lineNumber + " is corrupt or invalid: " + e.getMessage());
+                            }
+                        }
+                    });
         } catch (IOException e) {
             throw new RepositoryException("Error reading from file: " + filename, e);
         }
@@ -78,19 +87,19 @@ public abstract class AbstractFileRepository<ID,E extends Entity<ID>> extends In
      * Writes data to file from memory. Transforms entities to string
      */
     private void writeToFile() {
-        File file = new File(filename);
-        if (file.getParentFile() != null) {
-            file.getParentFile().mkdirs();
-        }
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, StandardCharsets.UTF_8))) {
-            for (E entity : super.getAll()) {
-                String entityAsString = createEntityAsString(entity);
-                writer.write(entityAsString);
-                writer.newLine();
+        Path path = Paths.get(filename);
+        try {
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
             }
+
+            List<String> serializedLines = StreamSupport.stream(super.getAll().spliterator(), false)
+                    .map(this::createEntityAsString)
+                    .collect(Collectors.toList());
+
+            Files.write(path, serializedLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new RepositoryException("Error writing to file", e);
+            throw new RepositoryException("Error writing to file: " + filename, e);
         }
     }
 

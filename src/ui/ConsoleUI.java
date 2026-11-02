@@ -1,5 +1,6 @@
 package ui;
 
+import domain.CriteriiUtilizator;
 import domain.Friendship;
 import domain.User;
 import domain.validators.ValidationException;
@@ -8,10 +9,12 @@ import service.SocialNetworkService;
 
 import java.util.List;
 import java.util.Scanner;
+import java.util.function.Predicate;
+import java.util.stream.StreamSupport;
 
 /**
  * Text-based user interface responsible for command handling,
- * reading user input, and displaying output messages.
+ * reading user input, and displaying output messages using functional paradigms[cite: 1, 3].
  */
 public class ConsoleUI {
     private final SocialNetworkService service;
@@ -41,6 +44,7 @@ public class ConsoleUI {
             System.out.println("6. Afiseaza toate prieteniile");
             System.out.println("7. Numar de comunitati");
             System.out.println("8. Cea mai sociabila comunitate");
+            System.out.println("9. Filtreaza utilizatori (demonstratie Predicate)");
             System.out.println("0. Iesire");
             System.out.print("Optiune: ");
 
@@ -71,6 +75,9 @@ public class ConsoleUI {
                         break;
                     case "8":
                         uiShowMostSociableCommunity();
+                        break;
+                    case "9":
+                        uiFilterUsers();
                         break;
                     case "0":
                         System.out.println("Aplicatia se inchide.");
@@ -128,21 +135,19 @@ public class ConsoleUI {
 
     private void uiShowUsers() {
         System.out.println("--- Lista Utilizatori ---");
-        for (User user : service.getAllUsers()) {
-            System.out.println(user);
-        }
+        StreamSupport.stream(service.getAllUsers().spliterator(), false)
+                .forEach(System.out::println); // Instance method reference on a particular object
     }
 
     private void uiShowFriendships() {
         System.out.println("--- Lista Prietenii ---");
-        Iterable<Friendship> friendships = service.getAllFriendships();
-        boolean hasAny = false;
-        for (Friendship friendship : friendships) {
-            System.out.println(friendship);
-            hasAny = true;
-        }
-        if (!hasAny) {
+        List<Friendship> friendships = StreamSupport.stream(service.getAllFriendships().spliterator(), false)
+                .toList();
+
+        if (friendships.isEmpty()) {
             System.out.println("Nu exista prietenii inregistrate.");
+        } else {
+            friendships.forEach(System.out::println);
         }
     }
 
@@ -158,8 +163,43 @@ public class ConsoleUI {
             System.out.println("Nu exista comunitati in retea.");
             return;
         }
-        for (User user : community) {
-            System.out.println(user);
+        community.forEach(System.out::println);
+    }
+
+    private void uiFilterUsers() {
+        System.out.println("Selectati criteriul de filtrare:");
+        System.out.println("a. Utilizatori dupa prefixul numelui de familie");
+        System.out.println("b. Utilizatori dupa domeniul de email");
+        System.out.println("c. Utilizatori fara prieteni");
+        System.out.print("Alegere: ");
+        String choice = scanner.nextLine().trim().toLowerCase();
+
+        Predicate<User> predicate;
+        switch (choice) {
+            case "a":
+                System.out.print("Introduceti prefixul: ");
+                String prefix = scanner.nextLine().trim();
+                predicate = CriteriiUtilizator.byLastNamePrefix(prefix);
+                break;
+            case "b":
+                System.out.print("Introduceti domeniul (ex: scs.ubbcluj.ro): ");
+                String domain = scanner.nextLine().trim();
+                predicate = CriteriiUtilizator.byEmailDomain(domain);
+                break;
+            case "c":
+                predicate = CriteriiUtilizator::faraPrieteni; // Static method reference[cite: 1]
+                break;
+            default:
+                System.out.println("Criteriu invalid!");
+                return;
+        }
+
+        List<User> filtered = service.findUsersMatching(predicate);
+        if (filtered.isEmpty()) {
+            System.out.println("Niciun utilizator nu corespunde criteriului.");
+        } else {
+            System.out.println("--- Rezultate filtrare ---");
+            filtered.forEach(System.out::println);
         }
     }
 }

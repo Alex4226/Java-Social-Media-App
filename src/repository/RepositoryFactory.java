@@ -42,11 +42,10 @@ public class RepositoryFactory {
     }
 
     /**
-     * Registers the repository creation strategies inside functional maps[cite: 1].
+     * Registers the repository creation strategies inside functional maps.
      */
     private void initCreators() {
-        // User repository strategies
-        userRepoCreators.put("memory", InMemoryRepository::new); // Constructor reference[cite: 1]
+        userRepoCreators.put("memory", InMemoryRepository::new);
         userRepoCreators.put("file", validator -> {
             String userFile = properties.getProperty("data.users", "data/utilizatori.txt");
             UserFileRepository fileRepo = new UserFileRepository(validator, userFile);
@@ -60,8 +59,7 @@ public class RepositoryFactory {
             return new UserDbRepository(validator, url, user, pass);
         });
 
-        // Friendship repository strategies
-        friendshipRepoCreators.put("memory", InMemoryRepository::new); // Constructor reference[cite: 1]
+        friendshipRepoCreators.put("memory", InMemoryRepository::new);
         friendshipRepoCreators.put("file", validator -> {
             String friendshipFile = properties.getProperty("data.friendships", "data/prietenii.txt");
             FriendshipFileRepository fileRepo = new FriendshipFileRepository(validator, friendshipFile);
@@ -77,10 +75,10 @@ public class RepositoryFactory {
     }
 
     /**
-     * Creates and returns a repository for User entities based on the configured repository type[cite: 1].
+     * Creates and returns a repository for User entities based on the configured repository type.
      *
-     * @param validator the validator to use
-     * @return initialized User repository
+     * @param validator the validator to inject into the repository
+     * @return initialized User repository instance
      */
     public Repository<Long, User> createUserRepository(Validator<User> validator) {
         String repoType = properties.getProperty("repository.type", "memory").trim().toLowerCase();
@@ -90,10 +88,10 @@ public class RepositoryFactory {
     }
 
     /**
-     * Creates and returns a repository for Friendship entities based on the configured repository type[cite: 1].
+     * Creates and returns a repository for Friendship entities based on the configured repository type.
      *
-     * @param validator the validator to use
-     * @return initialized Friendship repository
+     * @param validator the validator to inject into the repository
+     * @return initialized Friendship repository instance
      */
     public Repository<Tuple<Long, Long>, Friendship> createFriendshipRepository(Validator<Friendship> validator) {
         String repoType = properties.getProperty("repository.type", "memory").trim().toLowerCase();

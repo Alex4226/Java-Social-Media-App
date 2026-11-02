@@ -6,47 +6,85 @@ import domain.User;
 import repository.Repository;
 
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
- * Service responsabil cu logica de business a retelei sociale, coordonand operatiile
- * asupra utilizatorilor, relatiilor de prietenie si algoritmilor de analiza a comunitatilor[cite: 1, 3].
+ * Service class orchestrating social network business logic, user relationships,
+ * and graph-based community analytics using Java 8 Stream API.
  */
 public class SocialNetworkService {
-    private Repository<Long, User> userRepo;
-    private Repository<Tuple<Long, Long>, Friendship> friendshipRepo;
+    private final Repository<Long, User> userRepo;
+    private final Repository<Tuple<Long, Long>, Friendship> friendshipRepo;
     private Long currentUserId;
 
     /**
-     * Constructor care injecteaza dependintele de repository necesare pentru utilizatori si prietenii[cite: 3].
+     * Initializes the service with injected repositories for users and friendships,
+     * computes the initial sequence ID, and synchronizes friendship lists in memory.
      *
-     * @param userRepo       repository-ul pentru gestionarea utilizatorilor[cite: 3]
-     * @param friendshipRepo repository-ul pentru gestionarea relatiilor de prietenie[cite: 3]
+     * @param userRepo       the repository used to manage User entities
+     * @param friendshipRepo the repository used to manage Friendship entities
      */
     public SocialNetworkService(Repository<Long, User> userRepo, Repository<Tuple<Long, Long>, Friendship> friendshipRepo) {
         this.userRepo = userRepo;
         this.friendshipRepo = friendshipRepo;
         this.currentUserId = computeNextUserId();
-    }
-
-    private Long computeNextUserId() {
-        Long maxId = 0L;
-        for (User user : userRepo.getAll()) {
-            if (user.getId() != null & user.getId() > maxId) {
-                maxId = user.getId();
-            }
-        }
-        return maxId + 1;
+        syncFriendsLists();
     }
 
     /**
-     * Adauga un utilizator nou in retea, generandu-i automat identificatorul unic[cite: 1, 3].
+     * Synchronizes friends lists for all existing users from friendship repository records.
+     */
+    private void syncFriendsLists() {
+        toStream(friendshipRepo.getAll()).forEach(friendship -> {
+            Optional<User> user1Opt = findUser(friendship.getLeftId());
+            Optional<User> user2Opt = findUser(friendship.getRightId());
+
+            if (user1Opt.isPresent() && user2Opt.isPresent()) {
+                User u1 = user1Opt.get();
+                User u2 = user2Opt.get();
+                u1.addFriend(u2);
+                u2.addFriend(u1);
+            }
+        });
+    }
+
+    /**
+     * Helper utility converting an Iterable collection into a sequential Stream.
      *
-     * @param firstName prenumele utilizatorului
-     * @param lastName  numele de familie al utilizatorului
-     * @param email     adresa de email a utilizatorului
-     * @return utilizatorul creat si salvat[cite: 3]
-     * @throws IllegalArgumentException daca exista deja un utilizator cu acelasi identificator
-     * @throws domain.validators.ValidationException daca datele furnizate sunt invalide[cite: 3]
+     * @param <T>      the element type of the iterable
+     * @param iterable the source iterable to stream
+     * @return a sequential stream of elements from the source iterable
+     */
+    private <T> Stream<T> toStream(Iterable<T> iterable) {
+        return StreamSupport.stream(iterable.spliterator(), false);
+    }
+
+    /**
+     * Calculates the next sequential identifier available for user registration using Stream API.
+     *
+     * @return the next available unique identifier as a Long
+     */
+    private Long computeNextUserId() {
+        return toStream(userRepo.getAll())
+                .map(User::getId)
+                .filter(Objects::nonNull)
+                .max(Long::compareTo)
+                .map(maxId -> maxId + 1)
+                .orElse(1L);
+    }
+
+    /**
+     * Adds a new user to the network and assigns an auto-generated identifier.
+     *
+     * @param firstName user's first name
+     * @param lastName  user's last name
+     * @param email     user's email address
+     * @return the saved User entity
+     * @throws IllegalArgumentException if a user with the generated ID already exists
+     * @throws domain.validators.ValidationException if user attributes violate validation constraints
      */
     public User addUser(String firstName, String lastName, String email) {
         User user = new User(currentUserId, firstName, lastName, email);
@@ -59,76 +97,74 @@ public class SocialNetworkService {
     }
 
     /**
-     * Sterge un utilizator din sistem si elimina in cascada toate prieteniile asociate acestuia[cite: 1, 3].
+     * Removes a user and cascades the removal over all connected friendships using Streams,
+     * maintaining bidirectional friendship list consistency in memory.
      *
-     * @param id identificatorul utilizatorului ce urmeaza a fi sters[cite: 1, 3]
-     * @return entitatea User care a fost eliminata[cite: 3]
-     * @throws IllegalArgumentException daca ID-ul este null sau utilizatorul nu exista
+     * @param id identifier of the user to remove
+     * @return the removed User entity
+     * @throws IllegalArgumentException if the identifier is null or no user exists with the given id
      */
     public User removeUser(Long id) {
         if (id == null) {
             throw new IllegalArgumentException("ID must not be null!");
         }
 
-        User deletedUser = userRepo.delete(id);
-        if (deletedUser == null) {
-            throw new IllegalArgumentException("User with ID " + id + " does not exist!");
-        }
+        User deletedUser = Optional.ofNullable(userRepo.delete(id))
+                .orElseThrow(() -> new IllegalArgumentException("User with ID " + id + " does not exist!"));
 
-        java.util.List<Tuple<Long, Long>> friendshipsToDelete = new java.util.ArrayList<>();
-        for (Friendship friendship : friendshipRepo.getAll()) {
-            if (friendship.getLeftId().equals(id) || friendship.getRightId().equals(id)) {
-                friendshipsToDelete.add(friendship.getId());
-            }
-        }
+        // Clean memory references from remaining friends
+        new ArrayList<>(deletedUser.getFriends()).forEach(friend -> friend.removeFriend(deletedUser));
+        deletedUser.getFriends().clear();
 
-        for (Tuple<Long, Long> friendshipId : friendshipsToDelete) {
-            friendshipRepo.delete(friendshipId);
-        }
+        // Cascade deletion in the persistence repository
+        toStream(friendshipRepo.getAll())
+                .filter(f -> f.getLeftId().equals(id) || f.getRightId().equals(id))
+                .map(Friendship::getId)
+                .collect(Collectors.toList())
+                .forEach(friendshipRepo::delete);
 
         return deletedUser;
     }
 
     /**
-     * Cauta un utilizator dupa identificatorul sau unic.
+     * Finds a user wrapped inside an Optional.
      *
-     * @param id identificatorul utilizatorului cautat
-     * @return utilizatorul gasit sau {@code null} daca nu exista
-     * @throws IllegalArgumentException daca identificatorul primit este null
+     * @param id unique identifier of the user to locate
+     * @return an Optional containing the found user, or an empty Optional if no user exists with the specified id
+     * @throws IllegalArgumentException if the provided id is null
      */
-    public User findUser(Long id) {
-        return userRepo.find(id);
+    public Optional<User> findUser(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("ID must not be null");
+        }
+        return Optional.ofNullable(userRepo.find(id));
     }
 
     /**
-     * Returneaza toti utilizatorii inregistrati in retea.
+     * Retrieves all registered users as an Iterable.
      *
-     * @return o colectie iterabila ce contine toti utilizatorii
+     * @return an Iterable containing all users in the network
      */
     public Iterable<User> getAllUsers() {
         return userRepo.getAll();
     }
 
     /**
-     * Creeaza si salveaza o relatie de prietenie intre doi utilizatori existenti[cite: 1, 2, 3].
+     * Establishes a friendship between two existing users and synchronizes in-memory friend lists.
      *
-     * @param id1 identificatorul primului utilizator[cite: 2]
-     * @param id2 identificatorul celui de-al doilea utilizator[cite: 2]
-     * @return relatia de prietenie adaugata[cite: 3]
-     * @throws IllegalArgumentException daca ID-urile sunt nule, utilizatorii nu exista sau prietenia exista deja
-     * @throws domain.validators.ValidationException daca datele relatiei nu sunt valide[cite: 3]
+     * @param id1 first user identifier
+     * @param id2 second user identifier
+     * @return the newly created Friendship entity
+     * @throws IllegalArgumentException if any ID is null, any user does not exist, or the friendship already exists
+     * @throws domain.validators.ValidationException if the friendship entity fails domain validation
      */
     public Friendship addFriendship(Long id1, Long id2) {
         if (id1 == null || id2 == null) {
             throw new IllegalArgumentException("IDs must not be null!");
         }
 
-        if (userRepo.find(id1) == null) {
-            throw new IllegalArgumentException("User with ID " + id1 + " does not exist!");
-        }
-        if (userRepo.find(id2) == null) {
-            throw new IllegalArgumentException("User with ID " + id2 + " does not exist!");
-        }
+        User u1 = findUser(id1).orElseThrow(() -> new IllegalArgumentException("User with ID " + id1 + " does not exist!"));
+        User u2 = findUser(id2).orElseThrow(() -> new IllegalArgumentException("User with ID " + id2 + " does not exist!"));
 
         Long minId = Math.min(id1, id2);
         Long maxId = Math.max(id1, id2);
@@ -140,16 +176,19 @@ public class SocialNetworkService {
             throw new IllegalArgumentException("Friendship already exists!");
         }
 
+        u1.addFriend(u2);
+        u2.addFriend(u1);
+
         return friendship;
     }
 
     /**
-     * Sterge relatia de prietenie dintre doi utilizatori[cite: 1, 2, 3].
+     * Removes an established friendship between two users and updates in-memory friend lists.
      *
-     * @param id1 identificatorul primului utilizator[cite: 2]
-     * @param id2 identificatorul celui de-al doilea utilizator[cite: 2]
-     * @return relatia de prietenie eliminata[cite: 3]
-     * @throws IllegalArgumentException daca ID-urile sunt nule sau prietenia nu exista in sistem
+     * @param id1 first user identifier
+     * @param id2 second user identifier
+     * @return the removed Friendship entity
+     * @throws IllegalArgumentException if any ID is null or the friendship does not exist in the network
      */
     public Friendship removeFriendship(Long id1, Long id2) {
         if (id1 == null || id2 == null) {
@@ -160,160 +199,158 @@ public class SocialNetworkService {
         Long maxId = Math.max(id1, id2);
         Tuple<Long, Long> tuple = new Tuple<>(minId, maxId);
 
-        Friendship deleted = friendshipRepo.delete(tuple);
-        if (deleted == null) {
-            throw new IllegalArgumentException("Friendship does not exist!");
-        }
+        Friendship deleted = Optional.ofNullable(friendshipRepo.delete(tuple))
+                .orElseThrow(() -> new IllegalArgumentException("Friendship does not exist!"));
+
+        findUser(id1).ifPresent(u1 -> findUser(id2).ifPresent(u1::removeFriend));
+        findUser(id2).ifPresent(u2 -> findUser(id1).ifPresent(u2::removeFriend));
 
         return deleted;
     }
 
     /**
-     * Returneaza toate relatiile de prietenie din retea.
+     * Retrieves all friendships stored in the network.
      *
-     * @return o colectie iterabila ce contine toate prieteniile
+     * @return an Iterable containing all friendship relations
      */
     public Iterable<Friendship> getAllFriendships() {
         return friendshipRepo.getAll();
     }
 
     /**
-     * Construieste lista de adiacenta a grafului pe baza utilizatorilor si prieteniilor existente[cite: 2].
+     * Constructs the adjacency list representation of the network graph using Streams.
      *
-     * @return un dictionar ce mapeaza fiecare ID de utilizator la lista prietenilor sai[cite: 2]
+     * @return a map associating each user ID with the list of adjacent friend IDs
      */
     private Map<Long, List<Long>> buildAdjacencyList() {
-        Map<Long, List<Long>> adjList = new HashMap<>();
+        Map<Long, List<Long>> adjList = toStream(userRepo.getAll())
+                .collect(Collectors.toMap(User::getId, u -> new ArrayList<>()));
 
-        for (User user : userRepo.getAll()) {
-            adjList.put(user.getId(), new ArrayList<>());
-        }
+        toStream(friendshipRepo.getAll())
+                .forEach(friendship -> {
+                    Long u1 = friendship.getLeftId();
+                    Long u2 = friendship.getRightId();
 
-        for (Friendship friendship : friendshipRepo.getAll()) {
-            Long u1 = friendship.getLeftId();
-            Long u2 = friendship.getRightId();
-
-            if (adjList.containsKey(u1) && adjList.containsKey(u2)) {
-                adjList.get(u1).add(u2);
-                adjList.get(u2).add(u1);
-            }
-        }
+                    if (adjList.containsKey(u1) && adjList.containsKey(u2)) {
+                        adjList.get(u1).add(u2);
+                        adjList.get(u2).add(u1);
+                    }
+                });
 
         return adjList;
     }
 
     /**
-     * Parcurgere in adancime (DFS) pentru a colecta toate nodurile unei componente conexe[cite: 1, 3].
+     * Collects all nodes belonging to a connected component via depth-first search (DFS).
      *
-     * @param current   nodul curent vizitat in parcurgere
-     * @param adjList   lista de adiacenta a grafului
-     * @param visited   setul de noduri deja vizitate
-     * @param component lista in care se adauga nodurile componentei conexe curente[cite: 1]
+     * @param current   the current node being traversed
+     * @param adjList   the graph adjacency list
+     * @param visited   the set of visited node IDs to avoid cycles
+     * @param component the collection accumulating nodes of the current connected component
      */
     private void dfsCollectComponent(Long current, Map<Long, List<Long>> adjList, Set<Long> visited, List<Long> component) {
         visited.add(current);
         component.add(current);
 
-        for (Long neighbor : adjList.get(current)) {
-            if (!visited.contains(neighbor)) {
-                dfsCollectComponent(neighbor, adjList, visited, component);
-            }
-        }
+        adjList.getOrDefault(current, Collections.emptyList()).stream()
+                .filter(neighbor -> !visited.contains(neighbor))
+                .forEach(neighbor -> dfsCollectComponent(neighbor, adjList, visited, component));
     }
 
     /**
-     * Determina toate componentele conexe din graful retelei sociale[cite: 1, 3].
+     * Finds all connected components (communities) in the social network graph.
      *
-     * @return o lista de liste, fiecare sublista continand ID-urile utilizatorilor dintr-o comunitate[cite: 1, 3]
+     * @return a list of components, where each component is represented as a list of user IDs
      */
     private List<List<Long>> getAllComponents() {
         Map<Long, List<Long>> adjList = buildAdjacencyList();
         Set<Long> visited = new HashSet<>();
         List<List<Long>> components = new ArrayList<>();
 
-        for (Long userId : adjList.keySet()) {
-            if (!visited.contains(userId)) {
-                List<Long> component = new ArrayList<>();
-                dfsCollectComponent(userId, adjList, visited, component);
-                components.add(component);
-            }
-        }
+        adjList.keySet().stream()
+                .filter(userId -> !visited.contains(userId))
+                .forEach(userId -> {
+                    List<Long> component = new ArrayList<>();
+                    dfsCollectComponent(userId, adjList, visited, component);
+                    components.add(component);
+                });
 
         return components;
     }
 
     /**
-     * Calculeaza numarul total de comunitati (componente conexe) prezente in retea[cite: 1, 3].
+     * Returns the total count of connected communities in the network.
      *
-     * @return numarul de comunitati determinate[cite: 1, 3]
+     * @return the total number of connected components
      */
     public int getNumberOfCommunities() {
         return getAllComponents().size();
     }
 
     /**
-     * Determina recursiv lungimea celui mai lung drum simplu pornind dintr-un nod dat, utilizand DFS cu backtracking[cite: 3].
+     * Recursive backtracking traversal to compute the longest simple path originating from a given node.
      *
-     * @param current       nodul curent de pe drum
-     * @param adjList       lista de adiacenta a grafului
-     * @param visitedOnPath setul nodurilor vizitate pe drumul curent
-     * @return lungimea maxima a drumului simplu gasit din nodul curent[cite: 3]
+     * @param current       the current node being evaluated along the path
+     * @param adjList       the graph adjacency list
+     * @param visitedOnPath the set tracking nodes currently included in the path to avoid cycles
+     * @return the maximum length of a simple path starting from the current node
      */
     private int dfsLongestPathFromNode(Long current, Map<Long, List<Long>> adjList, Set<Long> visitedOnPath) {
         visitedOnPath.add(current);
-        int maxLen = 0;
 
-        for (Long neighbor : adjList.get(current)) {
-            if (!visitedOnPath.contains(neighbor)) {
-                int len = 1 + dfsLongestPathFromNode(neighbor, adjList, visitedOnPath);
-                if (len > maxLen) {
-                    maxLen = len;
-                }
-            }
-        }
+        int maxLen = adjList.getOrDefault(current, Collections.emptyList()).stream()
+                .filter(neighbor -> !visitedOnPath.contains(neighbor))
+                .mapToInt(neighbor -> 1 + dfsLongestPathFromNode(neighbor, adjList, visitedOnPath))
+                .max()
+                .orElse(0);
 
-        visitedOnPath.remove(current); // Backtracking
+        visitedOnPath.remove(current);
         return maxLen;
     }
 
     /**
-     * Determina cea mai sociabila comunitate din retea, definita ca fiind componenta conexa cu cel mai lung drum simplu[cite: 3].
+     * Computes the longest simple path length within a given connected component using Stream operations.
      *
-     * @return o lista de utilizatori care alcatuiesc cea mai sociabila comunitate[cite: 3]
+     * @param component the list of node IDs belonging to the connected component
+     * @param adjList   the graph adjacency list
+     * @return the length of the longest simple path found within the component
+     */
+    private int computeLongestPathInComponent(List<Long> component, Map<Long, List<Long>> adjList) {
+        return component.stream()
+                .mapToInt(node -> dfsLongestPathFromNode(node, adjList, new HashSet<>()))
+                .max()
+                .orElse(0);
+    }
+
+    /**
+     * Determines the most sociable community, identified as the component having the longest simple path.
+     *
+     * @return a list of User entities forming the most sociable community, or an empty list if no communities exist
      */
     public List<User> getMostSociableCommunity() {
         List<List<Long>> components = getAllComponents();
         if (components.isEmpty()) {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
 
         Map<Long, List<Long>> adjList = buildAdjacencyList();
-        List<Long> bestComponent = new ArrayList<>();
-        int maxPathLength = -1;
 
-        for (List<Long> component : components) {
-            int longestPathInComponent = 0;
-
-            for (Long node : component) {
-                Set<Long> visitedOnPath = new HashSet<>();
-                int pathLength = dfsLongestPathFromNode(node, adjList, visitedOnPath);
-                if (pathLength > longestPathInComponent) {
-                    longestPathInComponent = pathLength;
-                }
-            }
-
-            if (longestPathInComponent > maxPathLength) {
-                maxPathLength = longestPathInComponent;
-                bestComponent = component;
-            }
-        }
-
-        List<User> result = new ArrayList<>();
-        for (Long id : bestComponent) {
-            result.add(userRepo.find(id));
-        }
-
-        return result;
+        return components.stream()
+                .max(Comparator.comparingInt(comp -> computeLongestPathInComponent(comp, adjList)))
+                .map(bestComponent -> bestComponent.stream()
+                        .map(userRepo::find)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList()))
+                .orElse(Collections.emptyList());
     }
 
+    /**
+     * Retrieves all users satisfying a specified predicate condition.
+     *
+     * @param filter the predicate used to evaluate and filter users
+     * @return a list of users matching the filter predicate
+     */
+    public List<User> findUsersMatching(Predicate<User> filter) {
+        return userRepo.findAll(filter);
+    }
 }
