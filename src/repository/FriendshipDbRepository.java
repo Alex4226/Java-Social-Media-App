@@ -4,6 +4,8 @@ import domain.Friendship;
 import domain.Tuple;
 import domain.validators.Validator;
 
+import java.util.Optional;
+
 /**
  * Class for friendship repository in database. Implements repository
  */
@@ -28,7 +30,7 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
     }
 
     @Override
-    public Friendship find(Tuple<Long, Long> id) {
+    public Optional<Friendship> find(Tuple<Long, Long> id) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 
@@ -38,17 +40,17 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
     }
 
     @Override
-    public Friendship add(Friendship entity) {
+    public Optional<Friendship> add(Friendship entity) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 
     @Override
-    public Friendship delete(Tuple<Long, Long> id) {
+    public Optional<Friendship> delete(Tuple<Long, Long> id) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 
     @Override
-    public Friendship update(Friendship entity) {
+    public Optional<Friendship> update(Friendship entity) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 }

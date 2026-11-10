@@ -3,6 +3,8 @@ package repository;
 import domain.User;
 import domain.validators.Validator;
 
+import java.util.Optional;
+
 /**
  * Class for user repository in database. Implements repository
  */
@@ -27,7 +29,7 @@ public class UserDbRepository implements Repository<Long, User> {
     }
 
     @Override
-    public User find(Long id) {
+    public Optional<User> find(Long id) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 
@@ -37,17 +39,17 @@ public class UserDbRepository implements Repository<Long, User> {
     }
 
     @Override
-    public User add(User entity) {
+    public Optional<User> add(User entity) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 
     @Override
-    public User delete(Long id) {
+    public Optional<User> delete(Long id) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 
     @Override
-    public User update(User entity) {
+    public Optional<User> update(User entity) {
         throw new UnsupportedOperationException("Database repository not implemented yet.");
     }
 }

@@ -3,8 +3,10 @@ package repository;
 import domain.Entity;
 import domain.validators.Validator;
 
+import javax.swing.text.html.Option;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Implementare in memorie a interfetei Repository, utilizand o colectie de tip Map[cite: 3].
@@ -34,11 +36,11 @@ public class InMemoryRepository<ID, E extends Entity<ID>> implements Repository<
      * @throws IllegalArgumentException daca identificatorul primit este null
      */
     @Override
-    public E find(ID id) {
+    public Optional<E> find(ID id) {
         if (id == null) {
             throw new IllegalArgumentException("ID must not be null!");
         }
-        return entities.get(id);
+        return Optional.ofNullable(entities.get(id));
     }
 
     /**
@@ -60,7 +62,7 @@ public class InMemoryRepository<ID, E extends Entity<ID>> implements Repository<
      * @throws domain.validators.ValidationException daca datele entitatii nu sunt valide[cite: 3]
      */
     @Override
-    public E add(E entity) {
+    public Optional<E> add(E entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null!");
         }
@@ -68,11 +70,11 @@ public class InMemoryRepository<ID, E extends Entity<ID>> implements Repository<
         validator.validate(entity);
 
         if (entities.containsKey(entity.getId())) {
-            return entity;
+            return Optional.of(entity);
         }
 
         entities.put(entity.getId(), entity);
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -83,12 +85,12 @@ public class InMemoryRepository<ID, E extends Entity<ID>> implements Repository<
      * @throws IllegalArgumentException daca identificatorul primit este null
      */
     @Override
-    public E delete(ID id) {
+    public Optional<E> delete(ID id) {
         if (id == null) {
             throw new IllegalArgumentException("Id is invalid!");
         }
 
-        return entities.remove(id);
+        return Optional.ofNullable(entities.remove(id));
     }
 
     /**
@@ -100,7 +102,7 @@ public class InMemoryRepository<ID, E extends Entity<ID>> implements Repository<
      * @throws domain.validators.ValidationException daca datele entitatii nu sunt valide[cite: 3]
      */
     @Override
-    public E update(E entity) {
+    public Optional<E> update(E entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity cannot be null!");
         }
@@ -109,9 +111,9 @@ public class InMemoryRepository<ID, E extends Entity<ID>> implements Repository<
 
         if (entities.containsKey(entity.getId())) {
             entities.put(entity.getId(), entity);
-            return null;
+            return Optional.empty();
         }
 
-        return entity;
+        return Optional.of(entity);
     }
 }

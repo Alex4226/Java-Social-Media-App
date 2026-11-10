@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import java.util.Optional;
 
 /**
  * Abstract class that manages file loading and saving for every entity type. Inherites InMemoryRepository
@@ -109,12 +110,11 @@ public abstract class AbstractFileRepository<ID,E extends Entity<ID>> extends In
      * @return {@code null} if the addition was successful or the existing entity if the id already exists
      */
     @Override
-    public E add(E entity) {
-        E result = super.add(entity);
-        if (result == null) {
+    public Optional<E> add(E entity) {
+        Optional<E> result = super.add(entity);
+        if (result.isEmpty()) {
             writeToFile();
         }
-
         return result;
     }
 
@@ -124,12 +124,9 @@ public abstract class AbstractFileRepository<ID,E extends Entity<ID>> extends In
      * @return elminated entity or {@code null} if it doesn't exist
      */
     @Override
-    public E delete(ID id) {
-        E result = super.delete(id);
-        if (result != null) {
-            writeToFile();
-        }
-
+    public Optional<E> delete(ID id) {
+        Optional<E> result = super.delete(id);
+        result.ifPresent(e -> writeToFile());
         return result;
     }
 
@@ -139,12 +136,11 @@ public abstract class AbstractFileRepository<ID,E extends Entity<ID>> extends In
      * @return {@code null} if the update was successful or the received entity if it wasn't found in the memory
      */
     @Override
-    public E update(E entity) {
-        E result = super.update(entity);
-        if (result == null) {
+    public Optional<E> update(E entity) {
+        Optional<E> result = super.update(entity);
+        if (result.isEmpty()) {
             writeToFile();
         }
-
         return result;
     }
 }

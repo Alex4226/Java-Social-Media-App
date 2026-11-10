@@ -88,8 +88,8 @@ public class SocialNetworkService {
      */
     public User addUser(String firstName, String lastName, String email) {
         User user = new User(currentUserId, firstName, lastName, email);
-        User result = userRepo.add(user);
-        if (result != null) {
+        Optional<User> result = userRepo.add(user);
+        if (result.isPresent()) {
             throw new IllegalArgumentException("User with this ID already exists!");
         }
         currentUserId++;
@@ -109,7 +109,7 @@ public class SocialNetworkService {
             throw new IllegalArgumentException("ID must not be null!");
         }
 
-        User deletedUser = Optional.ofNullable(userRepo.delete(id))
+        User deletedUser = userRepo.delete(id)
                 .orElseThrow(() -> new IllegalArgumentException("User with ID " + id + " does not exist!"));
 
         // Clean memory references from remaining friends
@@ -137,7 +137,7 @@ public class SocialNetworkService {
         if (id == null) {
             throw new IllegalArgumentException("ID must not be null");
         }
-        return Optional.ofNullable(userRepo.find(id));
+        return userRepo.find(id);
     }
 
     /**
@@ -171,8 +171,8 @@ public class SocialNetworkService {
         Tuple<Long, Long> tuple = new Tuple<>(minId, maxId);
 
         Friendship friendship = new Friendship(tuple);
-        Friendship result = friendshipRepo.add(friendship);
-        if (result != null) {
+        Optional<Friendship> result = friendshipRepo.add(friendship);
+        if (result.isPresent()) {
             throw new IllegalArgumentException("Friendship already exists!");
         }
 
@@ -199,7 +199,7 @@ public class SocialNetworkService {
         Long maxId = Math.max(id1, id2);
         Tuple<Long, Long> tuple = new Tuple<>(minId, maxId);
 
-        Friendship deleted = Optional.ofNullable(friendshipRepo.delete(tuple))
+        Friendship deleted = friendshipRepo.delete(tuple)
                 .orElseThrow(() -> new IllegalArgumentException("Friendship does not exist!"));
 
         findUser(id1).ifPresent(u1 -> findUser(id2).ifPresent(u1::removeFriend));
@@ -339,7 +339,7 @@ public class SocialNetworkService {
                 .max(Comparator.comparingInt(comp -> computeLongestPathInComponent(comp, adjList)))
                 .map(bestComponent -> bestComponent.stream()
                         .map(userRepo::find)
-                        .filter(Objects::nonNull)
+                        .flatMap(Optional::stream)
                         .collect(Collectors.toList()))
                 .orElse(Collections.emptyList());
     }
