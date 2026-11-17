@@ -1,1 +1,1 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html","k":"18"},{"l":"domain"},{"l":"domain.validators"},{"l":"repository"},{"l":"service"},{"l":"ui"}];updateSearchResults();
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html","k":"18"},{"l":"domain"},{"l":"domain.validators"},{"l":"repository"},{"l":"repository.exceptions"},{"l":"service"},{"l":"test"},{"l":"ui"}];updateSearchResults();

@@ -2,5 +2,7 @@ unnamed package
 domain
 domain.validators
 repository
+repository.exceptions
 service
+test
 ui

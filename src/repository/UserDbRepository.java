@@ -10,7 +10,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Class for user repository in database. Implements repository
+ * PostgreSQL database repository implementation for {@link User} entities.
+ * Persists users using JDBC and retrieves database-generated primary keys.
  */
 public class UserDbRepository implements Repository<Long, User> {
     private final Validator<User> validator;
@@ -19,11 +20,12 @@ public class UserDbRepository implements Repository<Long, User> {
     private final String password;
 
     /**
-     * Constructor for user db repository
-     * @param validator validator of users
-     * @param url The JDBC URL used to connect to the database.
-     * @param username The username credential for authenticating with the db
-     * @param password The password credential for authentication with the db
+     * Constructs a new {@code UserDbRepository} with the given validator and database connection parameters.
+     *
+     * @param validator the validator used to validate {@link User} entities before persistence operations
+     * @param url       the JDBC URL used to connect to the PostgreSQL database
+     * @param username  the username credential for authenticating with the database
+     * @param password  the password credential for authenticating with the database
      */
     public UserDbRepository(Validator<User> validator, String url, String username, String password) {
         this.validator = validator;
@@ -32,15 +34,20 @@ public class UserDbRepository implements Repository<Long, User> {
         this.password = password;
     }
 
+    /**
+     * Extracts a {@link User} entity from the current row of the given {@link ResultSet}.
+     *
+     * @param rs the {@link ResultSet} positioned at a valid user record
+     * @return the constructed {@link User} instance
+     * @throws SQLException if a database access error occurs or a column label is invalid
+     */
     private User extractUser(ResultSet rs) throws SQLException {
         long id = rs.getLong("id");
-        String first_name = rs.getString("first_name");
-        String last_name = rs.getString("last_name");
+        String firstName = rs.getString("first_name");
+        String lastName = rs.getString("last_name");
         String email = rs.getString("email");
 
-        User u = new User(id, first_name, last_name, email);
-
-        return u;
+        return new User(id, firstName, lastName, email);
     }
 
     @Override
@@ -51,15 +58,14 @@ public class UserDbRepository implements Repository<Long, User> {
 
         String query = "SELECT id, first_name, last_name, email FROM users WHERE id = ?";
 
-        try (Connection conn = DriverManager.getConnection(url, username, password); PreparedStatement stmt = conn.prepareStatement(query)) {
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setLong(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(extractUser(rs));
                 }
-                else {
-                    return Optional.empty();
-                }
+                return Optional.empty();
             }
         } catch (SQLException e) {
             throw new RepositoryException("Database error while finding user", e);
@@ -70,13 +76,13 @@ public class UserDbRepository implements Repository<Long, User> {
     public Iterable<User> getAll() {
         List<User> users = new ArrayList<>();
         String sql = "SELECT id, first_name, last_name, email FROM users";
-        try (Connection conn = DriverManager.getConnection(url, username, password); PreparedStatement stmt = conn.prepareStatement(sql)) {
-            try (ResultSet rs = stmt.executeQuery()) {
-                while(rs.next()) {
-                    users.add(extractUser(rs));
-                }
-                return users;
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                users.add(extractUser(rs));
             }
+            return users;
         } catch (SQLException e) {
             throw new RepositoryException("Database error while finding users", e);
         }
@@ -85,7 +91,7 @@ public class UserDbRepository implements Repository<Long, User> {
     @Override
     public Optional<User> add(User entity) {
         if (entity == null) {
-            throw new IllegalArgumentException("User cannot be empty");
+            throw new IllegalArgumentException("User cannot be null");
         }
         validator.validate(entity);
         String sql = "INSERT INTO users (first_name, last_name, email) VALUES (?, ?, ?)";
@@ -137,8 +143,8 @@ public class UserDbRepository implements Repository<Long, User> {
 
     @Override
     public Optional<User> update(User entity) {
-        if (entity == null) {
-            throw new IllegalArgumentException("User cannot be null");
+        if (entity == null || entity.getId() == null) {
+            throw new IllegalArgumentException("User and user ID cannot be null");
         }
         validator.validate(entity);
         String sql = "UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE id = ?";

@@ -12,7 +12,7 @@ import java.util.stream.StreamSupport;
  * Generic CRUD repository interface using Java 8 Optional and Stream API.
  *
  * @param <ID> the entity identifier type
- * @param <E>  the entity type extending Entity<ID>
+ * @param <E>  the entity type extending {@code Entity<ID>}
  */
 public interface Repository<ID, E extends Entity<ID>> {
 

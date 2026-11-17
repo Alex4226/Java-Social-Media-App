@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Class for friendship repository in database. Implements repository
+ * PostgreSQL database repository implementation for {@link Friendship} entities.
+ * Stores symmetric user relationships with canonical ID ordering ({@code id1 < id2}).
  */
 public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Friendship> {
     private final Validator<Friendship> validator;
@@ -21,11 +22,12 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
     private final String password;
 
     /**
-     * Constructor for friendship db repository
-     * @param validator validator of friendships
-     * @param url The JDBC URL used to connect to the database.
-     * @param username The username credential for authenticating with the db
-     * @param password The password credential for authentication with the db
+     * Constructs a new {@code FriendshipDbRepository} with the given validator and database connection parameters.
+     *
+     * @param validator the validator used to validate {@link Friendship} entities before persistence operations
+     * @param url       the JDBC URL used to connect to the PostgreSQL database
+     * @param username  the username credential for authenticating with the database
+     * @param password  the password credential for authenticating with the database
      */
     public FriendshipDbRepository(Validator<Friendship> validator, String url, String username, String password) {
         this.validator = validator;
@@ -34,6 +36,13 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
         this.password = password;
     }
 
+    /**
+     * Normalizes a composite friendship ID so that the smaller user ID is always placed on the left ({@code id1 < id2}).
+     *
+     * @param id the {@link Tuple} containing the two user IDs
+     * @return a normalized {@link Tuple} with {@code left <= right}
+     * @throws IllegalArgumentException if {@code id} or either of its elements is {@code null}
+     */
     private Tuple<Long, Long> normalizeId(Tuple<Long, Long> id) {
         if (id == null || id.getLeft() == null || id.getRight() == null) {
             throw new IllegalArgumentException("Friendship ID and its components must not be null");
@@ -41,6 +50,13 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
         return new Tuple<>(Math.min(id.getLeft(), id.getRight()), Math.max(id.getLeft(), id.getRight()));
     }
 
+    /**
+     * Extracts a {@link Friendship} entity from the current row of the given {@link ResultSet}.
+     *
+     * @param rs the {@link ResultSet} positioned at a valid friendship record
+     * @return the constructed {@link Friendship} instance with a normalized composite ID
+     * @throws SQLException if a database access error occurs or a column label is invalid
+     */
     private Friendship extractFriendship(ResultSet rs) throws SQLException {
         long id1 = rs.getLong("id1");
         long id2 = rs.getLong("id2");
@@ -131,7 +147,7 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
 
     @Override
     public Optional<Friendship> update(Friendship entity) {
-        if (entity == null) {
+        if (entity == null || entity.getId() == null) {
             throw new IllegalArgumentException("Friendship entity must not be null");
         }
         validator.validate(entity);
