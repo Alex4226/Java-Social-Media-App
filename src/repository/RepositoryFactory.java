@@ -52,9 +52,9 @@ public class RepositoryFactory {
             fileRepo.loadData();
             return fileRepo;
         });
-        userRepoCreators.put("db", validator -> {
+        userRepoCreators.put("database", validator -> {
             String url = properties.getProperty("db.url");
-            String user = properties.getProperty("db.username");
+            String user = properties.getProperty("db.user");
             String pass = properties.getProperty("db.password");
             return new UserDbRepository(validator, url, user, pass);
         });
@@ -66,9 +66,9 @@ public class RepositoryFactory {
             fileRepo.loadData();
             return fileRepo;
         });
-        friendshipRepoCreators.put("db", validator -> {
+        friendshipRepoCreators.put("database", validator -> {
             String url = properties.getProperty("db.url");
-            String user = properties.getProperty("db.username");
+            String user = properties.getProperty("db.user");
             String pass = properties.getProperty("db.password");
             return new FriendshipDbRepository(validator, url, user, pass);
         });

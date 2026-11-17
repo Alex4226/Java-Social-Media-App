@@ -3,7 +3,12 @@ package repository;
 import domain.Friendship;
 import domain.Tuple;
 import domain.validators.Validator;
+import repository.exceptions.RepositoryException;
 
+import java.sql.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,28 +34,120 @@ public class FriendshipDbRepository implements Repository<Tuple<Long, Long>, Fri
         this.password = password;
     }
 
+    private Tuple<Long, Long> normalizeId(Tuple<Long, Long> id) {
+        if (id == null || id.getLeft() == null || id.getRight() == null) {
+            throw new IllegalArgumentException("Friendship ID and its components must not be null");
+        }
+        return new Tuple<>(Math.min(id.getLeft(), id.getRight()), Math.max(id.getLeft(), id.getRight()));
+    }
+
+    private Friendship extractFriendship(ResultSet rs) throws SQLException {
+        long id1 = rs.getLong("id1");
+        long id2 = rs.getLong("id2");
+        Timestamp time = rs.getTimestamp("friends_from");
+        LocalDateTime date = (time != null) ? time.toLocalDateTime() : null;
+        return new Friendship(normalizeId(new Tuple<>(id1, id2)), date);
+    }
+
     @Override
     public Optional<Friendship> find(Tuple<Long, Long> id) {
-        throw new UnsupportedOperationException("Database repository not implemented yet.");
+        Tuple<Long, Long> normalizedId = normalizeId(id);
+        String sql = "SELECT id1, id2, friends_from FROM friendships WHERE id1 = ? AND id2 = ?";
+
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, normalizedId.getLeft());
+            stmt.setLong(2, normalizedId.getRight());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(extractFriendship(rs));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RepositoryException("Database error while finding friendship", e);
+        }
     }
 
     @Override
     public Iterable<Friendship> getAll() {
-        throw new UnsupportedOperationException("Database repository not implemented yet.");
+        List<Friendship> friendships = new ArrayList<>();
+        String sql = "SELECT id1, id2, friends_from FROM friendships";
+
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                friendships.add(extractFriendship(rs));
+            }
+            return friendships;
+        } catch (SQLException e) {
+            throw new RepositoryException("Database error while retrieving friendships", e);
+        }
     }
 
     @Override
     public Optional<Friendship> add(Friendship entity) {
-        throw new UnsupportedOperationException("Database repository not implemented yet.");
+        if (entity == null) {
+            throw new IllegalArgumentException("Friendship entity must not be null");
+        }
+        validator.validate(entity);
+        Tuple<Long, Long> normalizedId = normalizeId(entity.getId());
+        entity.setId(normalizedId);
+
+        String sql = "INSERT INTO friendships (id1, id2, friends_from) VALUES (?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, normalizedId.getLeft());
+            stmt.setLong(2, normalizedId.getRight());
+            LocalDateTime date = (entity.getDate() != null) ? entity.getDate() : LocalDateTime.now();
+            stmt.setTimestamp(3, Timestamp.valueOf(date));
+            stmt.executeUpdate();
+            return Optional.empty();
+        } catch (SQLException e) {
+            throw new RepositoryException("Database error while adding friendship", e);
+        }
     }
 
     @Override
     public Optional<Friendship> delete(Tuple<Long, Long> id) {
-        throw new UnsupportedOperationException("Database repository not implemented yet.");
+        Tuple<Long, Long> normalizedId = normalizeId(id);
+        Optional<Friendship> existing = find(normalizedId);
+        if (existing.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String sql = "DELETE FROM friendships WHERE id1 = ? AND id2 = ?";
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, normalizedId.getLeft());
+            stmt.setLong(2, normalizedId.getRight());
+            stmt.executeUpdate();
+            return existing;
+        } catch (SQLException e) {
+            throw new RepositoryException("Database error while deleting friendship", e);
+        }
     }
 
     @Override
     public Optional<Friendship> update(Friendship entity) {
-        throw new UnsupportedOperationException("Database repository not implemented yet.");
+        if (entity == null) {
+            throw new IllegalArgumentException("Friendship entity must not be null");
+        }
+        validator.validate(entity);
+        Tuple<Long, Long> normalizedId = normalizeId(entity.getId());
+
+        String sql = "UPDATE friendships SET friends_from = ? WHERE id1 = ? AND id2 = ?";
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            LocalDateTime date = (entity.getDate() != null) ? entity.getDate() : LocalDateTime.now();
+            stmt.setTimestamp(1, Timestamp.valueOf(date));
+            stmt.setLong(2, normalizedId.getLeft());
+            stmt.setLong(3, normalizedId.getRight());
+            int rowsAffected = stmt.executeUpdate();
+            return (rowsAffected > 0) ? Optional.empty() : Optional.of(entity);
+        } catch (SQLException e) {
+            throw new RepositoryException("Database error while updating friendship", e);
+        }
     }
 }

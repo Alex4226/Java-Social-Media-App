@@ -87,12 +87,15 @@ public class SocialNetworkService {
      * @throws domain.validators.ValidationException if user attributes violate validation constraints
      */
     public User addUser(String firstName, String lastName, String email) {
-        User user = new User(currentUserId, firstName, lastName, email);
+        Long idToUse = (userRepo instanceof repository.UserDbRepository) ? null : currentUserId;
+        User user = new User(idToUse, firstName, lastName, email);
         Optional<User> result = userRepo.add(user);
         if (result.isPresent()) {
             throw new IllegalArgumentException("User with this ID already exists!");
         }
-        currentUserId++;
+        if (idToUse != null) {
+            currentUserId++;
+        }
         return user;
     }
 
@@ -109,21 +112,22 @@ public class SocialNetworkService {
             throw new IllegalArgumentException("ID must not be null!");
         }
 
-        User deletedUser = userRepo.delete(id)
+        User existingUser = findUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("User with ID " + id + " does not exist!"));
 
-        // Clean memory references from remaining friends
-        new ArrayList<>(deletedUser.getFriends()).forEach(friend -> friend.removeFriend(deletedUser));
-        deletedUser.getFriends().clear();
-
-        // Cascade deletion in the persistence repository
+        // Cascade deletion in the persistence repository first (respects FK constraints)
         toStream(friendshipRepo.getAll())
                 .filter(f -> f.getLeftId().equals(id) || f.getRightId().equals(id))
                 .map(Friendship::getId)
                 .collect(Collectors.toList())
                 .forEach(friendshipRepo::delete);
 
-        return deletedUser;
+        // Clean memory references from remaining friends
+        new ArrayList<>(existingUser.getFriends()).forEach(friend -> friend.removeFriend(existingUser));
+        existingUser.getFriends().clear();
+
+        return userRepo.delete(id)
+                .orElseThrow(() -> new IllegalArgumentException("User with ID " + id + " does not exist!"));
     }
 
     /**

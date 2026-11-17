@@ -42,7 +42,7 @@ public class Main {
 
         Validator<Friendship> friendshipValidator = new FriendshipValidator();
 
-        RepositoryFactory factory = new RepositoryFactory("application.properties");
+        RepositoryFactory factory = new RepositoryFactory("config.properties");
 
         Repository<Long, User> userRepository = factory.createUserRepository(composedUserValidator);
         Repository<Tuple<Long, Long>, Friendship> friendshipRepository = factory.createFriendshipRepository(friendshipValidator);

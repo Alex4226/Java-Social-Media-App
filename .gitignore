@@ -44,3 +44,7 @@ build/
 
 ### Log-uri ###
 *.log
+
+### Configurare locala & secrete ###
+config.properties
+!config.example.properties
