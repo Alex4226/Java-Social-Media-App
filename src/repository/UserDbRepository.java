@@ -3,9 +3,12 @@ package repository;
 import domain.User;
 import domain.validators.Validator;
 import repository.exceptions.RepositoryException;
+import util.paging.Page;
+import util.paging.Pageable;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,7 +16,7 @@ import java.util.Optional;
  * PostgreSQL database repository implementation for {@link User} entities.
  * Persists users using JDBC and retrieves database-generated primary keys.
  */
-public class UserDbRepository implements Repository<Long, User> {
+public class UserDbRepository implements PagingRepository<Long, User> {
     private final Validator<User> validator;
     private final String url;
     private final String username;
@@ -165,4 +168,45 @@ public class UserDbRepository implements Repository<Long, User> {
             throw new RepositoryException("Database error while updating user", e);
         }
     }
+
+    @Override
+    public Page<User> findAllOnPage(Pageable pageable) {
+        if (pageable == null) {
+            throw new IllegalArgumentException("Pageable must not be null!");
+        }
+
+        String countQuery = "SELECT COUNT(*) AS count FROM users";
+        String selectQuery = "SELECT id, first_name, last_name, email FROM users ORDER BY id LIMIT ? OFFSET ?";
+
+        try (Connection conn = DriverManager.getConnection(url, username, password)) {
+            int totalCount = 0;
+            try (PreparedStatement countStmt = conn.prepareStatement(countQuery);
+                 ResultSet countRs = countStmt.executeQuery()) {
+                if (countRs.next()) {
+                    totalCount = countRs.getInt("count");
+                }
+            }
+
+            int offset = pageable.getPageNumber() * pageable.getPageSize();
+            if (totalCount == 0 || offset >= totalCount) {
+                return new Page<>(Collections.emptyList(), totalCount);
+            }
+
+            List<User> users = new ArrayList<>();
+            try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
+                selectStmt.setInt(1, pageable.getPageSize());
+                selectStmt.setInt(2, offset);
+                try (ResultSet rs = selectStmt.executeQuery()) {
+                    while (rs.next()) {
+                        users.add(extractUser(rs));
+                    }
+                }
+            }
+
+            return new Page<>(users, totalCount);
+        } catch (SQLException e) {
+            throw new RepositoryException("Database error while getting users page", e);
+        }
+    }
+
 }

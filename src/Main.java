@@ -48,7 +48,8 @@ public class Main {
         Repository<Tuple<Long, Long>, Friendship> friendshipRepository = factory.createFriendshipRepository(friendshipValidator);
 
         SocialNetworkService service = new SocialNetworkService(userRepository, friendshipRepository);
-        ConsoleUI console = new ConsoleUI(service);
+        int pageSize = factory.getPageSize();
+        ConsoleUI console = new ConsoleUI(service, pageSize);
 
         console.run();
     }

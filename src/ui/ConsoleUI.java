@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.function.Predicate;
 import java.util.stream.StreamSupport;
+import java.util.function.Function;
+import util.paging.Page;
+import util.paging.Pageable;
 
 /**
  * Text-based user interface responsible for command handling,
@@ -19,15 +22,18 @@ import java.util.stream.StreamSupport;
 public class ConsoleUI {
     private final SocialNetworkService service;
     private final Scanner scanner;
+    private final int pageSize;
 
     /**
      * Constructs a new ConsoleUI instance.
      *
      * @param service the social network service used to execute operations
+     * @param pageSize the number of elements displayed per page
      */
-    public ConsoleUI(SocialNetworkService service) {
+    public ConsoleUI(SocialNetworkService service, int pageSize) {
         this.service = service;
         this.scanner = new Scanner(System.in);
+        this.pageSize = pageSize;
     }
 
     /**
@@ -45,6 +51,8 @@ public class ConsoleUI {
             System.out.println("7. Numar de comunitati");
             System.out.println("8. Cea mai sociabila comunitate");
             System.out.println("9. Filtreaza utilizatori (demonstratie Predicate)");
+            System.out.println("10. Afiseaza utilizatorii (paginat)");
+            System.out.println("11. Afiseaza prietenii unui utilizator (paginat)");
             System.out.println("0. Iesire");
             System.out.print("Optiune: ");
 
@@ -78,6 +86,12 @@ public class ConsoleUI {
                         break;
                     case "9":
                         uiFilterUsers();
+                        break;
+                    case "10":
+                        uiShowUsersPaginated();
+                        break;
+                    case "11":
+                        uiShowFriendsPaginated();
                         break;
                     case "0":
                         System.out.println("Aplicatia se inchide.");
@@ -200,6 +214,69 @@ public class ConsoleUI {
         } else {
             System.out.println("--- Rezultate filtrare ---");
             filtered.forEach(System.out::println);
+        }
+    }
+
+    private void uiShowUsersPaginated() {
+        paginate(service::getUsersOnPage, "Utilizatori (Paginat)");
+    }
+
+    private void uiShowFriendsPaginated() {
+        System.out.print("ID utilizator: ");
+        Long userId = Long.parseLong(scanner.nextLine().trim());
+        paginate(pageable -> service.getFriendsOnPage(userId, pageable),
+                "Prietenii utilizatorului " + userId + " (Paginat)");
+    }
+
+    private void paginate(Function<Pageable, Page<User>> pageFetcher, String title) {
+        int currentPage = 0;
+
+        while (true) {
+            Pageable pageable = new Pageable(currentPage, pageSize);
+            Page<User> page = pageFetcher.apply(pageable);
+
+            int totalElements = page.getTotalNumberOfElements();
+            int totalPages = (int) Math.ceil((double) totalElements / pageSize);
+            List<User> elements = StreamSupport.stream(page.getElementsOnPage().spliterator(), false).toList();
+
+            System.out.println("\n--- " + title + " ---");
+            if (elements.isEmpty()) {
+                System.out.println("Nu exista elemente pe aceasta pagina.");
+            } else {
+                elements.forEach(System.out::println);
+            }
+
+            int displayPage = (totalPages == 0) ? 0 : (currentPage + 1);
+            System.out.println("Pagina " + displayPage + " din " + totalPages + " (Total: " + totalElements + ")");
+            System.out.print("[n] Inainte | [p] Inapoi | [g] Mergi la pagina | [x] Iesire: ");
+
+            String cmd = scanner.nextLine().trim().toLowerCase();
+            switch (cmd) {
+                case "n":
+                    if (currentPage + 1 < totalPages) {
+                        currentPage++;
+                    } else {
+                        System.out.println("Esti deja pe ultima pagina.");
+                    }
+                    break;
+                case "p":
+                    if (currentPage > 0) {
+                        currentPage--;
+                    } else {
+                        System.out.println("Esti deja pe prima pagina.");
+                    }
+                    break;
+                case "g":
+                    System.out.print("Numar pagina: ");
+                    int targetPage = Integer.parseInt(scanner.nextLine().trim());
+                    currentPage = targetPage - 1;
+                    break;
+                case "x":
+                    return;
+                default:
+                    System.out.println("Comanda invalida!");
+                    break;
+            }
         }
     }
 }

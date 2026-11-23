@@ -6,3 +6,4 @@ repository.exceptions
 service
 test
 ui
+util.paging

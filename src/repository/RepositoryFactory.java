@@ -99,4 +99,19 @@ public class RepositoryFactory {
                 .orElse(friendshipRepoCreators.get("memory"))
                 .apply(validator);
     }
+
+    /**
+     * Retrieves the configured page size from the properties file.
+     *
+     * @return the configured page size (defaults to 5 if not specified)
+     * @throws IllegalArgumentException if the configured page size is not a valid positive integer
+     */
+    public int getPageSize() {
+        String raw = properties.getProperty("page.size", "5").trim();
+        int pageSize = Integer.parseInt(raw);
+        if (pageSize <= 0) {
+            throw new IllegalArgumentException("Configured page.size must be greater than zero");
+        }
+        return pageSize;
+    }
 }

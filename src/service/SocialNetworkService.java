@@ -3,7 +3,11 @@ package service;
 import domain.Friendship;
 import domain.Tuple;
 import domain.User;
+import repository.FriendshipDbRepository;
+import repository.PagingRepository;
 import repository.Repository;
+import util.paging.Page;
+import util.paging.Pageable;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -154,6 +158,24 @@ public class SocialNetworkService {
     }
 
     /**
+     * Retrieves a specific page of users from the repository.
+     *
+     * @param pageable pagination parameters specifying page number and page size
+     * @return a {@link Page} of users
+     * @throws IllegalArgumentException      if {@code pageable} is null
+     * @throws UnsupportedOperationException if the active user repository does not support pagination
+     */
+    public Page<User> getUsersOnPage(Pageable pageable) {
+        if (pageable == null) {
+            throw new IllegalArgumentException("Pageable must not be null!");
+        }
+        if (userRepo instanceof PagingRepository<Long, User> pagingUserRepo) {
+            return pagingUserRepo.findAllOnPage(pageable);
+        }
+        throw new UnsupportedOperationException("Pagination is only supported for database repositories!");
+    }
+
+    /**
      * Establishes a friendship between two existing users and synchronizes in-memory friend lists.
      *
      * @param id1 first user identifier
@@ -219,6 +241,27 @@ public class SocialNetworkService {
      */
     public Iterable<Friendship> getAllFriendships() {
         return friendshipRepo.getAll();
+    }
+
+    /**
+     * Retrieves a specific page of friends for a given user.
+     *
+     * @param userId   the ID of the user whose friends are retrieved
+     * @param pageable pagination parameters specifying page number and page size
+     * @return a {@link Page} of friends for the specified user
+     * @throws IllegalArgumentException      if {@code userId} or {@code pageable} is null, or the user does not exist
+     * @throws UnsupportedOperationException if the active friendship repository does not support pagination
+     */
+    public Page<User> getFriendsOnPage(Long userId, Pageable pageable) {
+        if (userId == null || pageable == null) {
+            throw new IllegalArgumentException("User ID and pageable must not be null!");
+        }
+        findUser(userId).orElseThrow(() -> new IllegalArgumentException("User with ID " + userId + " does not exist!"));
+
+        if (friendshipRepo instanceof FriendshipDbRepository friendshipDbRepo) {
+            return friendshipDbRepo.findFriendsOnPage(userId, pageable);
+        }
+        throw new UnsupportedOperationException("Pagination is only supported for database repositories!");
     }
 
     /**
